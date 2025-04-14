@@ -54,6 +54,12 @@ def get_neighbors_local(i):
 # Shouldn't need to alter this function except to switch
 # from local grader function to grader.get_neighbors()
 # when you submit.
+def getNeighbors(i):
+    try:
+        return grader.get_neighbors(i)
+    except:
+        return get_neighbors_local(i)
+
 def squared_wire_length_objective(V):
     global N
     where = [None] * N
@@ -67,6 +73,25 @@ def squared_wire_length_objective(V):
             total += d * d
     return total / 2  # divide by 2 since we count each distance above twice
 
+def buildPos(order):
+    pos = [0] * len(order)
+    for idx, node in enumerate(order):
+        pos[node] = idx
+    return pos
+
+def deltaSwap(order, pos, i, j):
+    nodeI = order[i]
+    nodeJ = order[j]
+    deltaSum = 0
+    for neighbor in getNeighbors(nodeI):
+        if neighbor == nodeJ:
+            continue
+        deltaSum += ((j - pos[neighbor])**2 - (i - pos[neighbor])**2)
+    for neighbor in getNeighbors(nodeJ):
+        if neighbor == nodeI:
+            continue
+        deltaSum += ((i - pos[neighbor])**2 - (j - pos[neighbor])**2)
+    return deltaSum / 2.0
 
 def main():
     global N
@@ -93,41 +118,50 @@ def main():
     # longer and you run the risk of your code timing
     # out for the testcase and not receiving credit.
 
-    # start_time = os.times().elapsed
-    start_time = time.time()
-    best_order = []
-    order = []
-    best_cost = -1
-    while True:
-        order = [None] * N
-        for i in range(N):
-            order[i] = i
-            # start with initial order 0,1,2,3,...
-            # then swap each element with a random preceding element
-            # this makes the entire array a random permutation of 0...N-1
-            random_idx = random.randint(0, sys.maxsize) % (i + 1)
-            order[i], order[random_idx] = order[random_idx], order[i]
-        cost = squared_wire_length_objective(order)
-        if best_cost == -1 or cost < best_cost:
-            best_cost = cost
-            best_order = order  # remember best ordering so far...
+    startTime = time.time()
+    timeLimit = 28.0  # Time budget for Python submissions.
 
-        # It's recommended to NOT make this call every single iteration -
-        # this is a system call and is actually rather slow compared
-        # to other commands. Instead, check every hundred iterations or so.
-        # How often you check may need to be fine tuned in order to not time
-        # out on the autograding system.
-        # elapsed = os.times().elapsed - start_time
-        elapsed = time.time() - start_time
+    bestCost = -1
+    currentOrder = list(range(N))
+    random.shuffle(currentOrder)
+    pos = buildPos(currentOrder)
+    currentCost = squared_wire_length_objective(currentOrder)
+    bestOrder = currentOrder[:]
+    bestCost = currentCost
 
-        # Break out of the loop after 28 seconds
-        # DO NOT increase the "28.0" - you risk your code timing out if you do
-        if elapsed > 28.0:
-            break
+    # Outer loop: keep improving while there is time left.
+    while time.time() - startTime < timeLimit:
+        improved = False
+        for _ in range(1000):
+            if time.time() - startTime >= timeLimit:
+                break
+            a = random.randint(0, N - 1)
+            b = random.randint(0, N - 1)
+            if a == b:
+                continue
+            if a > b:
+                a, b = b, a
+            d = deltaSwap(currentOrder, pos, a, b)
+            if d < 0:
+                currentOrder[a], currentOrder[b] = currentOrder[b], currentOrder[a]
+                pos[currentOrder[a]] = a
+                pos[currentOrder[b]] = b
+                currentCost += d
+                improved = True
+                if currentCost < bestCost:
+                    bestCost = currentCost
+                    bestOrder = currentOrder[:]
+                break
+        if not improved:
+            currentOrder = list(range(N))
+            random.shuffle(currentOrder)
+            pos = buildPos(currentOrder)
+            currentCost = squared_wire_length_objective(currentOrder)
+            if currentCost < bestCost:
+                bestCost = currentCost
+                bestOrder = currentOrder[:]
 
-    # At the end, you should print out a sequence of points
-    # (a permutation of 0..N-1) delimited by whitespace
-    print(" ".join(map(str, best_order)))
+    print(" ".join(map(str, bestOrder)))
 
 
 if __name__ == "__main__":
